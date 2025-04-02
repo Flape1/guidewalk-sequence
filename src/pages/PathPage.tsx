@@ -1,9 +1,9 @@
 
 import React from 'react';
-import Navigator from '@/components/Navigator';
+import PathViewer from '@/components/PathViewer';
 import paths from '@/data/paths';
 
-const Index = () => {
+const PathPage = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-wayfinding-dark text-white py-6">
@@ -14,7 +14,7 @@ const Index = () => {
       </header>
       
       <main>
-        <Navigator paths={paths} />
+        <PathViewer paths={paths} />
       </main>
       
       <footer className="bg-wayfinding-dark text-gray-300 py-8 mt-16">
@@ -35,4 +35,4 @@ const Index = () => {
   );
 };
 
-export default Index;
+export default PathPage;
