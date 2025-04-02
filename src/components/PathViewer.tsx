@@ -45,7 +45,8 @@ const PathViewer: React.FC<PathViewerProps> = ({
   const [scrollLeft, setScrollLeft] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
   
-  const selectedPath = paths.find(p => p.id === selectedPathId) || (paths.length > 0 ? paths[0] : null);
+  // Find the selected path, defaulting to the first path if none is selected
+  const selectedPath = paths.find(p => p.id === selectedPathId) || paths[0];
   
   // Reset currentStepIndex when selectedPathId changes
   useEffect(() => {
@@ -105,8 +106,12 @@ const PathViewer: React.FC<PathViewerProps> = ({
     setTouchStart(null);
   };
 
-  if (!selectedPath) {
-    return <div>No path selected</div>;
+  if (!selectedPath || !selectedPath.steps || selectedPath.steps.length === 0) {
+    return (
+      <div className={`flex items-center justify-center ${fullPage ? 'h-screen w-screen' : 'h-[600px] w-full'} bg-gray-100`}>
+        <div className="text-gray-500">No path selected or path has no steps</div>
+      </div>
+    );
   }
 
   const currentStep = selectedPath.steps[currentStepIndex];
@@ -114,7 +119,7 @@ const PathViewer: React.FC<PathViewerProps> = ({
 
   return (
     <div 
-      className={`relative ${fullPage ? 'h-screen w-screen' : 'h-[600px] w-full'}`}
+      className={`relative ${fullPage ? 'h-screen w-screen' : 'h-[600px] w-full'} bg-black`}
       onMouseEnter={() => setShowControls(true)}
       onMouseLeave={() => setShowControls(false)}
     >
@@ -141,14 +146,14 @@ const PathViewer: React.FC<PathViewerProps> = ({
       {showControls && (
         <>
           <Button
-            className="absolute left-4 top-1/2 -translate-y-1/2"
+            className="absolute left-4 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70"
             onClick={handlePrevious}
             disabled={currentStepIndex === 0}
           >
             <ChevronLeft className="h-6 w-6" />
           </Button>
           <Button
-            className="absolute right-4 top-1/2 -translate-y-1/2"
+            className="absolute right-4 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70"
             onClick={handleNext}
             disabled={currentStepIndex === selectedPath.steps.length - 1}
           >
