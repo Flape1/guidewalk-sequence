@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import paths from '@/data/paths';
 import PathViewer from '@/components/PathViewer';
@@ -11,7 +10,7 @@ const Index = () => {
   };
 
   return (
-    <div className="h-screen w-screen overflow-hidden relative">
+    <div className="h-screen w-screen overflow-hidden">
       {/* Full-screen path viewer */}
       <PathViewer 
         paths={paths} 
@@ -20,34 +19,31 @@ const Index = () => {
         fullPage={true}
       />
       
-      {/* Hovering thumbnails at the bottom */}
-      <div className="absolute bottom-10 left-0 right-0 z-10">
-        <div className="container mx-auto max-w-6xl">
-          <div className="flex gap-2 overflow-x-auto pb-2 snap-x justify-center">
+      {/* Location cards overlay */}
+      <div className="fixed bottom-0 left-0 right-0 z-10">
+        <div className="bg-gradient-to-t from-black/90 via-black/50 to-transparent h-24 absolute inset-0" />
+        <div className="flex justify-center items-end h-full">
+          <div className="flex gap-2 justify-center pb-2">
             {paths.map((path) => (
               <div 
                 key={path.id}
-                className={`flex-shrink-0 cursor-pointer transition-all duration-200 snap-start ${
+                className={`cursor-pointer transition-all duration-200 ${
                   selectedPathId === path.id 
-                    ? 'ring-2 ring-wayfinding-blue scale-105 z-20' 
+                    ? 'ring-2 ring-white scale-105 z-20' 
                     : 'opacity-80 hover:opacity-100'
                 }`}
                 onClick={() => handlePathSelect(path.id)}
               >
-                <div className="w-40 relative">
+                <div className="w-32 relative">
                   <img 
                     src={path.steps[0].image} 
                     alt={path.name}
-                    className="w-full h-24 object-cover rounded-md shadow-lg" 
+                    className="w-full h-16 object-cover rounded-lg shadow-lg" 
                   />
-                  <div className={`absolute inset-0 flex items-end justify-center rounded-md ${
-                    selectedPathId === path.id 
-                      ? 'bg-blue-500 bg-opacity-20' 
-                      : 'bg-black bg-opacity-40'
-                  }`}>
-                    <p className="text-white text-sm font-medium p-2 text-center w-full truncate">
-                      {path.name}
-                    </p>
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent rounded-lg">
+                    <div className="absolute bottom-0 left-0 right-0 p-1">
+                      <h3 className="text-white text-xs font-medium text-center">{path.name}</h3>
+                    </div>
                   </div>
                 </div>
               </div>
