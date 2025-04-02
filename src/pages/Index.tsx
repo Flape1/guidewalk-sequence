@@ -13,11 +13,11 @@ const Index = () => {
         </div>
       </header>
       
-      <main>
+      <main className="py-8">
         <Navigator paths={paths} />
       </main>
       
-      <footer className="bg-wayfinding-dark text-gray-300 py-8 mt-16">
+      <footer className="bg-wayfinding-dark text-gray-300 py-8">
         <div className="container mx-auto px-4 max-w-6xl">
           <div className="flex flex-col md:flex-row justify-between items-center">
             <div className="mb-4 md:mb-0">
