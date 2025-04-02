@@ -2,7 +2,6 @@
 import React, { useState, useEffect } from 'react';
 import { Path } from '@/data/paths';
 import { Button } from '@/components/ui/button';
-import { Progress } from '@/components/ui/progress';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import {
   Carousel,
@@ -78,71 +77,57 @@ const PathViewer: React.FC<PathViewerProps> = ({
   }
 
   const currentStep = selectedPath.steps[currentStepIndex];
-  const progress = ((currentStepIndex + 1) / selectedPath.steps.length) * 100;
 
   return (
-    <div className={`relative ${fullPage ? 'h-full' : ''}`}>
-      <div className={`bg-wayfinding-dark shadow-xl ${fullPage ? 'h-full' : 'rounded-lg overflow-hidden h-[60vh] mb-6'}`}>
-        <Carousel setApi={setApi} className="w-full h-full" opts={{ loop: false }}>
-          <CarouselContent className="h-full">
-            {selectedPath.steps.map((step, index) => (
-              <CarouselItem key={index} className="h-full">
-                <div className="h-full w-full flex items-center justify-center">
-                  <img 
-                    src={step.image} 
-                    alt={step.description} 
-                    className="w-full h-full object-cover transition-all duration-500 ease-in-out"
-                  />
-                </div>
-              </CarouselItem>
-            ))}
-          </CarouselContent>
-          
-          <div className="hidden">
-            <CarouselPrevious />
-            <CarouselNext />
-          </div>
-        </Carousel>
-      </div>
+    <div className="h-full w-full relative">
+      <Carousel setApi={setApi} className="w-full h-full" opts={{ loop: false }}>
+        <CarouselContent className="h-full">
+          {selectedPath.steps.map((step, index) => (
+            <CarouselItem key={index} className="h-full">
+              <div className="h-full w-full flex items-center justify-center">
+                <img 
+                  src={step.image} 
+                  alt={step.description} 
+                  className="w-full h-full object-cover transition-all duration-500 ease-in-out"
+                />
+              </div>
+            </CarouselItem>
+          ))}
+        </CarouselContent>
+      </Carousel>
       
-      {/* Overlay controls for navigation */}
-      <div className={`absolute ${fullPage ? 'bottom-4 left-0 right-0' : 'bottom-8 left-0 right-0'}`}>
+      {/* Minimal navigation controls */}
+      <div className="absolute bottom-40 left-0 right-0 z-10 pointer-events-none">
         <div className="container mx-auto px-4 max-w-6xl">
-          <div className="bg-black bg-opacity-60 rounded-lg p-4 text-white">
-            <div className="mb-3">
-              <div className="flex justify-between items-center mb-1">
-                <span className="text-sm font-medium">
-                  Step {currentStepIndex + 1} of {selectedPath.steps.length}
-                </span>
-                <span className="text-sm font-medium">{Math.round(progress)}%</span>
-              </div>
-              <Progress value={progress} className="h-2" />
-            </div>
-            
-            <div className="flex flex-col sm:flex-row justify-between space-y-2 sm:space-y-0">
-              <div className="text-lg font-medium">{currentStep.description}</div>
-              
-              <div className="flex space-x-4">
-                <Button 
-                  variant="outline" 
-                  onClick={handlePrevious}
-                  disabled={currentStepIndex === 0}
-                  className="w-32 bg-opacity-70"
-                >
-                  <ChevronLeft className="mr-2 h-4 w-4" /> Previous
-                </Button>
-                
-                <Button 
-                  onClick={handleNext}
-                  disabled={currentStepIndex === selectedPath.steps.length - 1}
-                  className="w-32 bg-wayfinding-blue hover:bg-blue-600"
-                >
-                  Next <ChevronRight className="ml-2 h-4 w-4" />
-                </Button>
-              </div>
+          <div className="flex justify-center">
+            <div className="bg-black bg-opacity-50 backdrop-blur-sm rounded-lg p-3 pointer-events-auto">
+              <p className="text-white text-lg font-medium">{currentStep.description}</p>
             </div>
           </div>
         </div>
+      </div>
+      
+      {/* Side navigation buttons */}
+      <div className="absolute inset-y-0 left-0 flex items-center">
+        <Button 
+          variant="ghost" 
+          onClick={handlePrevious}
+          disabled={currentStepIndex === 0}
+          className="h-20 w-12 rounded-r-full bg-black bg-opacity-30 hover:bg-opacity-50 text-white"
+        >
+          <ChevronLeft className="h-8 w-8" />
+        </Button>
+      </div>
+      
+      <div className="absolute inset-y-0 right-0 flex items-center">
+        <Button 
+          variant="ghost" 
+          onClick={handleNext}
+          disabled={currentStepIndex === selectedPath.steps.length - 1}
+          className="h-20 w-12 rounded-l-full bg-black bg-opacity-30 hover:bg-opacity-50 text-white"
+        >
+          <ChevronRight className="h-8 w-8" />
+        </Button>
       </div>
     </div>
   );
