@@ -1,11 +1,18 @@
 
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Path } from '@/data/paths';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
+import {
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+  CarouselPrevious,
+  CarouselNext,
+} from "@/components/ui/carousel";
 
 interface PathViewerProps {
   paths: Path[];
@@ -17,51 +24,39 @@ const PathViewer: React.FC<PathViewerProps> = ({ paths }) => {
   
   const [currentPath, setCurrentPath] = useState<Path | undefined>();
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
-  const [animatingForward, setAnimatingForward] = useState(false);
-  const [animatingBackward, setAnimatingBackward] = useState(false);
-  const [prevImage, setPrevImage] = useState<string | null>(null);
-  const [currentImage, setCurrentImage] = useState<string | null>(null);
+  const [api, setApi] = useState<any>(null);
   
   useEffect(() => {
     const path = paths.find(p => p.id === pathId);
     if (path) {
       setCurrentPath(path);
-      setCurrentImage(path.steps[0].image);
     } else {
       toast.error("Path not found");
       navigate('/');
     }
   }, [pathId, paths, navigate]);
 
-  const handleNext = useCallback(() => {
-    if (!currentPath || animatingForward || animatingBackward) return;
+  useEffect(() => {
+    if (!api) return;
     
-    if (currentStepIndex < currentPath.steps.length - 1) {
-      setAnimatingForward(true);
-      setPrevImage(currentImage);
-      setCurrentImage(currentPath.steps[currentStepIndex + 1].image);
-      
-      setTimeout(() => {
-        setCurrentStepIndex(prev => prev + 1);
-        setAnimatingForward(false);
-      }, 750); // Match with animation duration
-    }
-  }, [currentPath, currentStepIndex, animatingForward, animatingBackward, currentImage]);
+    const handleSelect = () => {
+      setCurrentStepIndex(api.selectedScrollSnap());
+    };
+    
+    api.on("select", handleSelect);
+    
+    return () => {
+      api.off("select", handleSelect);
+    };
+  }, [api]);
 
-  const handlePrevious = useCallback(() => {
-    if (!currentPath || animatingForward || animatingBackward) return;
-    
-    if (currentStepIndex > 0) {
-      setAnimatingBackward(true);
-      setPrevImage(currentImage);
-      setCurrentImage(currentPath.steps[currentStepIndex - 1].image);
-      
-      setTimeout(() => {
-        setCurrentStepIndex(prev => prev - 1);
-        setAnimatingBackward(false);
-      }, 750); // Match with animation duration
-    }
-  }, [currentPath, currentStepIndex, animatingForward, animatingBackward, currentImage]);
+  const handleNext = () => {
+    if (api) api.scrollNext();
+  };
+
+  const handlePrevious = () => {
+    if (api) api.scrollPrev();
+  };
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -74,7 +69,7 @@ const PathViewer: React.FC<PathViewerProps> = ({ paths }) => {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleNext, handlePrevious]);
+  }, [api]);
 
   if (!currentPath) {
     return <div className="flex justify-center items-center h-screen">Loading...</div>;
@@ -98,44 +93,27 @@ const PathViewer: React.FC<PathViewerProps> = ({ paths }) => {
         <p className="text-muted-foreground">{currentPath.description}</p>
       </div>
       
-      <div className="relative rounded-lg overflow-hidden bg-wayfinding-dark shadow-xl h-[60vh] mb-6">
-        <div className="image-transition-container">
-          {prevImage && animatingForward && (
-            <img 
-              src={prevImage} 
-              alt="Previous" 
-              className="image-transition animate-image-zoom-in"
-            />
-          )}
-          {prevImage && animatingBackward && (
-            <img 
-              src={prevImage} 
-              alt="Previous" 
-              className="image-transition animate-fade-out"
-            />
-          )}
-          {currentImage && !animatingForward && !animatingBackward && (
-            <img 
-              src={currentImage} 
-              alt={currentStep.description} 
-              className="image-transition animate-fade-in"
-            />
-          )}
-          {currentImage && animatingForward && (
-            <img 
-              src={currentImage} 
-              alt={currentStep.description} 
-              className="image-transition animate-image-zoom-out"
-            />
-          )}
-          {currentImage && animatingBackward && (
-            <img 
-              src={currentImage} 
-              alt={currentStep.description} 
-              className="image-transition animate-fade-in"
-            />
-          )}
-        </div>
+      <div className="rounded-lg overflow-hidden bg-wayfinding-dark shadow-xl h-[60vh] mb-6">
+        <Carousel setApi={setApi} className="w-full h-full" opts={{ loop: false }}>
+          <CarouselContent className="h-full">
+            {currentPath.steps.map((step, index) => (
+              <CarouselItem key={index} className="h-full">
+                <div className="h-full w-full flex items-center justify-center">
+                  <img 
+                    src={step.image} 
+                    alt={step.description} 
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              </CarouselItem>
+            ))}
+          </CarouselContent>
+          
+          <div className="hidden">
+            <CarouselPrevious />
+            <CarouselNext />
+          </div>
+        </Carousel>
       </div>
       
       <div className="mb-8">
@@ -155,7 +133,7 @@ const PathViewer: React.FC<PathViewerProps> = ({ paths }) => {
           <Button 
             variant="outline" 
             onClick={handlePrevious}
-            disabled={currentStepIndex === 0 || animatingForward || animatingBackward}
+            disabled={currentStepIndex === 0}
             className="w-32"
           >
             <ChevronLeft className="mr-2 h-4 w-4" /> Previous
@@ -163,7 +141,7 @@ const PathViewer: React.FC<PathViewerProps> = ({ paths }) => {
           
           <Button 
             onClick={handleNext}
-            disabled={currentStepIndex === currentPath.steps.length - 1 || animatingForward || animatingBackward}
+            disabled={currentStepIndex === currentPath.steps.length - 1}
             className="w-32 bg-wayfinding-blue hover:bg-blue-600"
           >
             Next <ChevronRight className="ml-2 h-4 w-4" />
