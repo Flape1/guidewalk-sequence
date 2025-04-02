@@ -1,16 +1,27 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import paths from '@/data/paths';
 import PathViewer from '@/components/PathViewer';
 
 const Index = () => {
-  const [selectedPathId, setSelectedPathId] = useState(paths.length > 0 ? paths[0].id : '');
+  const [selectedPathId, setSelectedPathId] = useState<string>('');
+  const [isInitialized, setIsInitialized] = useState(false);
+
+  // Initialize with the first path if available
+  useEffect(() => {
+    if (paths.length > 0 && !isInitialized) {
+      setSelectedPathId(paths[0].id);
+      setIsInitialized(true);
+    }
+  }, [isInitialized]);
 
   const handlePathSelect = (pathId: string) => {
-    setSelectedPathId(pathId);
+    if (paths.some(path => path.id === pathId)) {
+      setSelectedPathId(pathId);
+    }
   };
 
   return (
-    <div className="h-screen w-screen overflow-hidden">
+    <div className="h-screen w-screen overflow-hidden bg-black">
       {/* Full-screen path viewer */}
       <PathViewer 
         paths={paths} 
