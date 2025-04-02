@@ -47,6 +47,11 @@ const PathViewer: React.FC<PathViewerProps> = ({
   
   const selectedPath = paths.find(p => p.id === selectedPathId) || (paths.length > 0 ? paths[0] : null);
   
+  // Reset currentStepIndex when selectedPathId changes
+  useEffect(() => {
+    setCurrentStepIndex(0);
+  }, [selectedPathId]);
+  
   useEffect(() => {
     // Check device type and orientation
     const checkDevice = () => {
@@ -65,7 +70,7 @@ const PathViewer: React.FC<PathViewerProps> = ({
   }, []);
 
   const handleNext = () => {
-    if (currentStepIndex < selectedPath.steps.length - 1) {
+    if (selectedPath && currentStepIndex < selectedPath.steps.length - 1) {
       setCurrentStepIndex(prev => prev + 1);
     }
   };
