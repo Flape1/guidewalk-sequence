@@ -4,6 +4,7 @@
   NODE_VERSION = "20.11.1"
   NPM_FLAGS = "--legacy-peer-deps"
   NODE_ENV = "production"
+  NETLIFY_BUILD_DEBUG = "true"
 
 [[redirects]]
   from = "/*"
