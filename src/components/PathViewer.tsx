@@ -43,6 +43,7 @@ const PathViewer: React.FC<PathViewerProps> = ({
   const [isLandscape, setIsLandscape] = useState(false);
   const [touchStart, setTouchStart] = useState<number | null>(null);
   const [scrollLeft, setScrollLeft] = useState(0);
+  const [isTransitioning, setIsTransitioning] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   
   // Find the selected path, defaulting to the first path if none is selected
@@ -71,14 +72,18 @@ const PathViewer: React.FC<PathViewerProps> = ({
   }, []);
 
   const handleNext = () => {
-    if (selectedPath && currentStepIndex < selectedPath.steps.length - 1) {
+    if (selectedPath && currentStepIndex < selectedPath.steps.length - 1 && !isTransitioning) {
+      setIsTransitioning(true);
       setCurrentStepIndex(prev => prev + 1);
+      setTimeout(() => setIsTransitioning(false), 500);
     }
   };
 
   const handlePrevious = () => {
-    if (currentStepIndex > 0) {
+    if (currentStepIndex > 0 && !isTransitioning) {
+      setIsTransitioning(true);
       setCurrentStepIndex(prev => prev - 1);
+      setTimeout(() => setIsTransitioning(false), 500);
     }
   };
 
@@ -125,16 +130,16 @@ const PathViewer: React.FC<PathViewerProps> = ({
     >
       <div 
         ref={containerRef}
-        className="h-full w-full overflow-x-auto overflow-y-hidden"
+        className="h-full w-full overflow-hidden"
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
       >
-        <div className="h-full min-w-full flex items-center justify-center">
+        <div className="h-full w-full flex items-center justify-center">
           <img 
             src={currentStep.image} 
             alt={currentStep.description}
-            className="h-full w-auto object-contain"
+            className={`w-full h-full object-cover transition-opacity duration-500 ${isTransitioning ? 'opacity-0' : 'opacity-100'}`}
             style={{
               objectPosition: `${position.x} ${position.y}`
             }}
@@ -148,14 +153,14 @@ const PathViewer: React.FC<PathViewerProps> = ({
           <Button
             className="absolute left-4 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70"
             onClick={handlePrevious}
-            disabled={currentStepIndex === 0}
+            disabled={currentStepIndex === 0 || isTransitioning}
           >
             <ChevronLeft className="h-6 w-6" />
           </Button>
           <Button
             className="absolute right-4 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70"
             onClick={handleNext}
-            disabled={currentStepIndex === selectedPath.steps.length - 1}
+            disabled={currentStepIndex === selectedPath.steps.length - 1 || isTransitioning}
           >
             <ChevronRight className="h-6 w-6" />
           </Button>
