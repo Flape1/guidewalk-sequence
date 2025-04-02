@@ -6,7 +6,9 @@
       "use": "@vercel/static-build",
       "config": {
         "distDir": "dist",
-        "nodeVersion": "20.x"
+        "nodeVersion": "20.11.1",
+        "buildCommand": "npm install && npm run build",
+        "installCommand": "npm install"
       }
     }
   ],
