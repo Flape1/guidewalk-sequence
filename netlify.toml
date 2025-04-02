@@ -1,10 +1,8 @@
 [build]
-  command = "npm ci && npm run build"
+  command = "npm install && npm run build"
   publish = "dist"
-
-[build.environment]
   NODE_VERSION = "20.11.1"
-  NPM_FLAGS = "--no-optional"
+  NPM_FLAGS = "--legacy-peer-deps"
   NODE_ENV = "production"
 
 [[redirects]]
