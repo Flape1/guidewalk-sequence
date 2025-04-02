@@ -1,5 +1,5 @@
 [build]
-  command = "npm install && npm run build"
+  command = "nvm install 20.11.1 && nvm use 20.11.1 && npm install && npm run build"
   publish = "dist"
   NODE_VERSION = "20.11.1"
   NPM_FLAGS = "--legacy-peer-deps"
