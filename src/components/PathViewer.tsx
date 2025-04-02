@@ -105,21 +105,8 @@ const PathViewer: React.FC<PathViewerProps> = ({
     setTouchStart(null);
   };
 
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'ArrowRight') {
-        handleNext();
-      } else if (e.key === 'ArrowLeft') {
-        handlePrevious();
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [currentStepIndex]);
-
   if (!selectedPath) {
-    return <div className="flex justify-center items-center h-screen">Loading...</div>;
+    return <div>No path selected</div>;
   }
 
   const currentStep = selectedPath.steps[currentStepIndex];
@@ -127,103 +114,65 @@ const PathViewer: React.FC<PathViewerProps> = ({
 
   return (
     <div 
-      className="h-screen w-screen fixed inset-0 bg-black"
-      onMouseEnter={() => !isMobile && setShowControls(true)}
-      onMouseLeave={() => !isMobile && setShowControls(false)}
+      className={`relative ${fullPage ? 'h-screen w-screen' : 'h-[600px] w-full'}`}
+      onMouseEnter={() => setShowControls(true)}
+      onMouseLeave={() => setShowControls(false)}
     >
       <div 
         ref={containerRef}
-        className="h-full w-full overflow-x-auto overflow-y-hidden overscroll-x-contain touch-pan-x"
+        className="h-full w-full overflow-x-auto overflow-y-hidden"
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
       >
-        <div className="h-full min-w-fit flex items-center justify-start">
+        <div className="h-full min-w-full flex items-center justify-center">
           <img 
             src={currentStep.image} 
-            alt={currentStep.description} 
-            className="h-full w-auto max-w-none"
+            alt={currentStep.description}
+            className="h-full w-auto object-contain"
             style={{
-              objectFit: 'contain'
+              objectPosition: `${position.x} ${position.y}`
             }}
-            loading="eager"
           />
-        </div>
-      </div>
-      
-      {/* Interactive step indicator */}
-      <div className={`absolute ${isMobile ? (isLandscape ? 'bottom-4' : 'bottom-20') : 'bottom-28'} left-0 right-0 z-10`}>
-        <div className="container mx-auto px-4 max-w-6xl">
-          <div className="flex justify-center gap-2">
-            {selectedPath.steps.map((_, index) => (
-              <button
-                key={index}
-                onClick={() => setCurrentStepIndex(index)}
-                className={`${isMobile ? 'w-2 h-2' : 'w-3 h-3'} rounded-full transition-all duration-300 ${
-                  currentStepIndex === index 
-                    ? 'bg-white scale-125' 
-                    : 'bg-white/50 hover:bg-white/75'
-                }`}
-              />
-            ))}
-          </div>
         </div>
       </div>
 
-      {/* Step description with progress */}
-      <div className={`absolute ${isMobile ? (isLandscape ? 'bottom-2' : 'bottom-12') : 'bottom-20'} left-0 right-0 z-10`}>
-        <div className="container mx-auto px-4 max-w-6xl">
-          <div className="flex justify-center">
-            <div className="bg-black/60 backdrop-blur-sm rounded-lg p-2 text-center max-w-[90%]">
-              <p className="text-white text-sm font-medium">
-                Step {currentStepIndex + 1} of {selectedPath.steps.length}: {currentStep.description}
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-      
-      {/* Navigation buttons with fade effect */}
-      {!isMobile && (
+      {/* Navigation Controls */}
+      {showControls && (
         <>
-          <div className={`absolute inset-y-0 left-0 flex items-center transition-opacity duration-300 ${showControls ? 'opacity-100' : 'opacity-0'}`}>
-            <Button 
-              variant="ghost" 
-              onClick={handlePrevious}
-              disabled={currentStepIndex === 0}
-              className="h-20 w-12 rounded-r-full bg-black/50 hover:bg-black/70 text-white"
-            >
-              <ChevronLeft className="h-8 w-8" />
-            </Button>
-          </div>
-          
-          <div className={`absolute inset-y-0 right-0 flex items-center transition-opacity duration-300 ${showControls ? 'opacity-100' : 'opacity-0'}`}>
-            <Button 
-              variant="ghost" 
-              onClick={handleNext}
-              disabled={currentStepIndex === selectedPath.steps.length - 1}
-              className="h-20 w-12 rounded-l-full bg-black/50 hover:bg-black/70 text-white"
-            >
-              <ChevronRight className="h-8 w-8" />
-            </Button>
-          </div>
+          <Button
+            className="absolute left-4 top-1/2 -translate-y-1/2"
+            onClick={handlePrevious}
+            disabled={currentStepIndex === 0}
+          >
+            <ChevronLeft className="h-6 w-6" />
+          </Button>
+          <Button
+            className="absolute right-4 top-1/2 -translate-y-1/2"
+            onClick={handleNext}
+            disabled={currentStepIndex === selectedPath.steps.length - 1}
+          >
+            <ChevronRight className="h-6 w-6" />
+          </Button>
         </>
       )}
-      
-      {/* Mobile touch controls for next/previous */}
-      {isMobile && (
-        <div className="absolute inset-0 flex pointer-events-none">
-          <div 
-            className="w-1/4 h-full pointer-events-auto"
-            onClick={handlePrevious}
+
+      {/* Step Indicator */}
+      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex space-x-2">
+        {selectedPath.steps.map((_, index) => (
+          <div
+            key={index}
+            className={`w-2 h-2 rounded-full ${
+              index === currentStepIndex ? 'bg-white' : 'bg-white/50'
+            }`}
           />
-          <div className="w-1/2 h-full" />
-          <div 
-            className="w-1/4 h-full pointer-events-auto"
-            onClick={handleNext}
-          />
-        </div>
-      )}
+        ))}
+      </div>
+
+      {/* Step Description */}
+      <div className="absolute bottom-16 left-1/2 -translate-x-1/2 bg-black/50 text-white px-4 py-2 rounded">
+        {currentStep.description}
+      </div>
     </div>
   );
 };
