@@ -1,11 +1,12 @@
 [build]
-  command = "npm install --ignore-scripts && npm run build"
+  command = "npm ci && npm run build"
   publish = "dist"
 
 [build.environment]
   NODE_VERSION = "20.11.1"
   NPM_FLAGS = "--no-optional"
   NODE_ENV = "production"
+  CI = "true"
   GO_VERSION = "1.19"
 
 [[redirects]]
