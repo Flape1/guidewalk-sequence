@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Path } from '@/data/paths';
 import { Button } from '@/components/ui/button';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface PathViewerProps {
   paths: Path[];
@@ -40,12 +41,11 @@ const PathViewer: React.FC<PathViewerProps> = ({
 }) => {
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [showControls, setShowControls] = useState(false);
-  const [isMobile, setIsMobile] = useState(false);
-  const [isLandscape, setIsLandscape] = useState(false);
   const [touchStart, setTouchStart] = useState<number | null>(null);
-  const [scrollLeft, setScrollLeft] = useState(0);
+  const [touchEnd, setTouchEnd] = useState<number | null>(null);
   const [isTransitioning, setIsTransitioning] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const isMobile = useIsMobile();
+  const imageContainerRef = useRef<HTMLDivElement>(null);
   
   // Find the selected path, defaulting to the first path if none is selected
   const selectedPath = paths.find(p => p.id === selectedPathId) || (paths.length > 0 ? paths[0] : null);
@@ -54,29 +54,12 @@ const PathViewer: React.FC<PathViewerProps> = ({
   useEffect(() => {
     setCurrentStepIndex(0);
   }, [selectedPathId]);
-  
-  useEffect(() => {
-    // Check device type and orientation
-    const checkDevice = () => {
-      setIsMobile(window.innerWidth <= 768);
-      setIsLandscape(window.innerWidth > window.innerHeight);
-    };
-    
-    checkDevice();
-    window.addEventListener('resize', checkDevice);
-    window.addEventListener('orientationchange', checkDevice);
-    
-    return () => {
-      window.removeEventListener('resize', checkDevice);
-      window.removeEventListener('orientationchange', checkDevice);
-    };
-  }, []);
 
   const handleNext = () => {
     if (selectedPath && currentStepIndex < selectedPath.steps.length - 1 && !isTransitioning) {
       setIsTransitioning(true);
       setCurrentStepIndex(prev => prev + 1);
-      setTimeout(() => setIsTransitioning(false), 500);
+      setTimeout(() => setIsTransitioning(false), 300);
     }
   };
 
@@ -84,33 +67,58 @@ const PathViewer: React.FC<PathViewerProps> = ({
     if (currentStepIndex > 0 && !isTransitioning) {
       setIsTransitioning(true);
       setCurrentStepIndex(prev => prev - 1);
-      setTimeout(() => setIsTransitioning(false), 500);
+      setTimeout(() => setIsTransitioning(false), 300);
     }
   };
 
-  // Handle touch events for horizontal scrolling
+  // Handle touch events for swiping
   const handleTouchStart = (e: React.TouchEvent) => {
-    setTouchStart(e.touches[0].clientX);
-    if (containerRef.current) {
-      setScrollLeft(containerRef.current.scrollLeft);
-    }
+    setTouchEnd(null);
+    setTouchStart(e.targetTouches[0].clientX);
   };
 
   const handleTouchMove = (e: React.TouchEvent) => {
-    if (!touchStart || !containerRef.current) return;
-    
-    const touchDelta = touchStart - e.touches[0].clientX;
-    containerRef.current.scrollLeft = scrollLeft + touchDelta;
-    
-    // Prevent vertical scrolling while swiping horizontally
-    if (Math.abs(touchDelta) > 5) {
-      e.preventDefault();
-    }
+    setTouchEnd(e.targetTouches[0].clientX);
   };
 
   const handleTouchEnd = () => {
+    if (!touchStart || !touchEnd) return;
+    
+    // Calculate the swipe distance
+    const distance = touchStart - touchEnd;
+    const minSwipeDistance = 50; // Minimum distance required for a swipe
+    
+    // If the swipe is significant enough
+    if (Math.abs(distance) > minSwipeDistance) {
+      if (distance > 0) {
+        // Swiped left, go to next
+        handleNext();
+      } else {
+        // Swiped right, go to previous
+        handlePrevious();
+      }
+    }
+    
+    // Reset touch points
     setTouchStart(null);
+    setTouchEnd(null);
   };
+
+  // Keyboard navigation
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowRight') {
+        handleNext();
+      } else if (e.key === 'ArrowLeft') {
+        handlePrevious();
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [currentStepIndex, selectedPath]);
 
   if (!selectedPath || !selectedPath.steps || selectedPath.steps.length === 0) {
     return (
@@ -122,72 +130,124 @@ const PathViewer: React.FC<PathViewerProps> = ({
 
   // Get the current step and make sure it exists before using it
   const currentStep = selectedPath.steps[currentStepIndex];
-  // Ensure currentStep exists before calling getImagePosition
-  const position = currentStep ? getImagePosition(currentStep) : { x: '50%', y: '50%' };
+  
+  // Need to load both current and next images for smooth transitions
+  const nextStepIndex = currentStepIndex < selectedPath.steps.length - 1 ? currentStepIndex + 1 : null;
+  const prevStepIndex = currentStepIndex > 0 ? currentStepIndex - 1 : null;
+  const nextStep = nextStepIndex !== null ? selectedPath.steps[nextStepIndex] : null;
+  const prevStep = prevStepIndex !== null ? selectedPath.steps[prevStepIndex] : null;
 
   return (
     <div 
-      className={`relative ${fullPage ? 'h-screen w-screen' : 'h-[600px] w-full'} bg-black`}
+      className={`relative ${fullPage ? 'h-screen w-screen' : 'h-[600px] w-full'} bg-black overflow-hidden`}
       onMouseEnter={() => setShowControls(true)}
       onMouseLeave={() => setShowControls(false)}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
     >
-      <div 
-        ref={containerRef}
-        className="h-full w-full overflow-hidden"
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
-      >
-        <div className="h-full w-full flex items-center justify-center">
-          {currentStep && (
+      {/* Main image container */}
+      <div ref={imageContainerRef} className="relative h-full w-full">
+        {/* Current image */}
+        {currentStep && (
+          <div className="absolute inset-0 z-10">
             <img 
               src={currentStep.image} 
-              alt={currentStep.description}
-              className={`w-full h-full object-cover transition-opacity duration-500 ${isTransitioning ? 'opacity-0' : 'opacity-100'}`}
+              alt={currentStep.description || 'Current step'}
+              className={`w-full h-full object-cover transition-all duration-300 ease-in-out ${isTransitioning ? 'opacity-0' : 'opacity-100'}`}
               style={{
-                objectPosition: `${position.x} ${position.y}`
+                objectPosition: getImagePosition(currentStep).x + ' ' + getImagePosition(currentStep).y
               }}
             />
-          )}
-        </div>
+          </div>
+        )}
+        
+        {/* Preload next and previous images for smoother transitions */}
+        {nextStep && (
+          <div className="absolute inset-0 z-0">
+            <img 
+              src={nextStep.image} 
+              alt={nextStep.description || 'Next step'}
+              className="w-full h-full object-cover opacity-0"
+              style={{
+                objectPosition: getImagePosition(nextStep).x + ' ' + getImagePosition(nextStep).y
+              }}
+            />
+          </div>
+        )}
+        
+        {prevStep && (
+          <div className="absolute inset-0 z-0">
+            <img 
+              src={prevStep.image} 
+              alt={prevStep.description || 'Previous step'}
+              className="w-full h-full object-cover opacity-0"
+              style={{
+                objectPosition: getImagePosition(prevStep).x + ' ' + getImagePosition(prevStep).y
+              }}
+            />
+          </div>
+        )}
       </div>
 
-      {/* Navigation Controls */}
-      {showControls && (
+      {/* Navigation Controls - show on desktop or when touch controls active */}
+      {(showControls || isMobile) && (
         <>
           <Button
-            className="absolute left-4 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70"
+            className={`absolute left-4 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 z-20 
+                       ${isMobile ? 'w-12 h-12 rounded-full flex items-center justify-center' : ''}`}
             onClick={handlePrevious}
             disabled={currentStepIndex === 0 || isTransitioning}
+            aria-label="Previous step"
           >
-            <ChevronLeft className="h-6 w-6" />
+            <ChevronLeft className={`${isMobile ? 'h-8 w-8' : 'h-6 w-6'}`} />
           </Button>
           <Button
-            className="absolute right-4 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70"
+            className={`absolute right-4 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 z-20
+                       ${isMobile ? 'w-12 h-12 rounded-full flex items-center justify-center' : ''}`}
             onClick={handleNext}
             disabled={currentStepIndex === selectedPath.steps.length - 1 || isTransitioning}
+            aria-label="Next step"
           >
-            <ChevronRight className="h-6 w-6" />
+            <ChevronRight className={`${isMobile ? 'h-8 w-8' : 'h-6 w-6'}`} />
           </Button>
         </>
       )}
 
-      {/* Step Indicator */}
-      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex space-x-2">
+      {/* Step Indicator Pills */}
+      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex space-x-2 z-20">
         {selectedPath.steps.map((_, index) => (
-          <div
+          <button
             key={index}
-            className={`w-2 h-2 rounded-full ${
-              index === currentStepIndex ? 'bg-white' : 'bg-white/50'
-            }`}
+            className={`w-3 h-3 rounded-full transition-all duration-200 
+                      ${index === currentStepIndex 
+                        ? 'bg-white scale-125' 
+                        : 'bg-white/50 hover:bg-white/70'}`}
+            onClick={() => {
+              if (!isTransitioning) {
+                setIsTransitioning(true);
+                setCurrentStepIndex(index);
+                setTimeout(() => setIsTransitioning(false), 300);
+              }
+            }}
+            aria-label={`Go to step ${index + 1}`}
           />
         ))}
       </div>
 
       {/* Step Description */}
       {currentStep && (
-        <div className="absolute bottom-16 left-1/2 -translate-x-1/2 bg-black/50 text-white px-4 py-2 rounded">
-          {currentStep.description}
+        <div className="absolute bottom-16 left-0 right-0 z-20 flex justify-center px-4">
+          <div className={`bg-black/60 text-white px-6 py-3 rounded-lg max-w-md text-center transition-opacity duration-300 ${isTransitioning ? 'opacity-0' : 'opacity-100'}`}>
+            {currentStep.description}
+          </div>
+        </div>
+      )}
+      
+      {/* Mobile swipe hint (shown briefly) */}
+      {isMobile && (
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 text-white/70 text-sm bg-black/40 px-3 py-1 rounded-full">
+          Swipe to navigate
         </div>
       )}
     </div>
