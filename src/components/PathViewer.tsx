@@ -50,6 +50,9 @@ const PathViewer: React.FC<PathViewerProps> = ({
   const [isPanning, setIsPanning] = useState(false);
   const [initialPanPosition, setInitialPanPosition] = useState({ x: 0, y: 0 });
   const [lastPanPosition, setLastPanPosition] = useState({ x: 0, y: 0 });
+  const [nextImageLoaded, setNextImageLoaded] = useState(false);
+  const [prevImageLoaded, setPrevImageLoaded] = useState(false);
+  const [activeImageIndex, setActiveImageIndex] = useState(0);
   
   const isMobile = useIsMobile();
   const imageContainerRef = useRef<HTMLDivElement>(null);
@@ -71,25 +74,49 @@ const PathViewer: React.FC<PathViewerProps> = ({
       selectedPath.steps.forEach(step => {
         const img = new Image();
         img.src = step.image;
+        img.onload = () => {
+          if (selectedPath.steps.indexOf(step) === currentStepIndex + 1) {
+            setNextImageLoaded(true);
+          } else if (selectedPath.steps.indexOf(step) === currentStepIndex - 1) {
+            setPrevImageLoaded(true);
+          }
+        };
       });
     }
-  }, [selectedPath]);
+  }, [selectedPath, currentStepIndex]);
+
+  // Set active image index to match current step after transition
+  useEffect(() => {
+    if (!isTransitioning) {
+      setActiveImageIndex(currentStepIndex);
+    }
+  }, [isTransitioning, currentStepIndex]);
 
   const handleNext = () => {
     if (selectedPath && currentStepIndex < selectedPath.steps.length - 1 && !isTransitioning) {
       setIsTransitioning(true);
-      setCurrentStepIndex(prev => prev + 1);
+      // Set next image as active before changing index
+      setActiveImageIndex(currentStepIndex + 1);
+      setNextImageLoaded(false);
+      setTimeout(() => {
+        setCurrentStepIndex(prevIndex => prevIndex + 1);
+      }, 50); // Small delay to allow the DOM to update
       resetZoomAndPan();
-      setTimeout(() => setIsTransitioning(false), 300);
+      setTimeout(() => setIsTransitioning(false), 400); // Longer to ensure animation completes
     }
   };
 
   const handlePrevious = () => {
     if (currentStepIndex > 0 && !isTransitioning) {
       setIsTransitioning(true);
-      setCurrentStepIndex(prev => prev - 1);
+      // Set previous image as active before changing index
+      setActiveImageIndex(currentStepIndex - 1);
+      setPrevImageLoaded(false);
+      setTimeout(() => {
+        setCurrentStepIndex(prevIndex => prevIndex - 1);
+      }, 50); // Small delay to allow the DOM to update
       resetZoomAndPan();
-      setTimeout(() => setIsTransitioning(false), 300);
+      setTimeout(() => setIsTransitioning(false), 400); // Longer to ensure animation completes
     }
   };
 
@@ -237,6 +264,30 @@ const PathViewer: React.FC<PathViewerProps> = ({
     };
   }, [currentStepIndex, selectedPath, imageScale]);
 
+  // Function to preload the current image and adjacent images
+  const preloadImages = (path: Path, currentIndex: number) => {
+    if (!path || !path.steps) return;
+    
+    // Array of indices to preload: current, next, and previous
+    const indicesToPreload = [
+      currentIndex,
+      currentIndex + 1 < path.steps.length ? currentIndex + 1 : null,
+      currentIndex - 1 >= 0 ? currentIndex - 1 : null
+    ].filter((idx): idx is number => idx !== null);
+    
+    indicesToPreload.forEach(idx => {
+      const img = new Image();
+      img.src = path.steps[idx].image;
+    });
+  };
+
+  // Preload images when component mounts or path/step changes
+  useEffect(() => {
+    if (selectedPath) {
+      preloadImages(selectedPath, currentStepIndex);
+    }
+  }, [selectedPath, currentStepIndex]);
+
   if (!selectedPath || !selectedPath.steps || selectedPath.steps.length === 0) {
     return (
       <div className={`flex items-center justify-center ${fullPage ? 'h-screen w-screen' : 'h-[600px] w-full'} bg-gray-100`}>
@@ -257,7 +308,7 @@ const PathViewer: React.FC<PathViewerProps> = ({
   // Image transformation styles
   const imageTransformStyle: CSSProperties = {
     transform: `scale(${imageScale}) translate(${panPosition.x}px, ${panPosition.y}px)`,
-    transition: isTransitioning ? 'opacity 300ms ease-in-out' : isPanning ? 'none' : 'transform 200ms ease-out',
+    transition: isPanning ? 'none' : 'transform 200ms ease-out',
     objectPosition: getImagePosition(currentStep).x + ' ' + getImagePosition(currentStep).y
   };
 
@@ -281,44 +332,52 @@ const PathViewer: React.FC<PathViewerProps> = ({
         }}
         onTouchEnd={handleTouchEnd}
       >
-        {/* Current image */}
-        {currentStep && (
-          <div className="absolute inset-0 z-10 overflow-hidden">
+        {/* Current visible image (active) */}
+        {selectedPath.steps[activeImageIndex] && (
+          <div className={`absolute inset-0 z-20 overflow-hidden transition-opacity duration-300 ease-in-out ${isTransitioning ? 'opacity-100' : 'opacity-100'}`}>
             <img 
-              ref={el => imageRefs.current[currentStepIndex] = el}
-              src={currentStep.image} 
-              alt={currentStep.description || 'Current step'}
-              className={`w-full h-full object-cover transition-opacity duration-300 ease-in-out ${isTransitioning ? 'opacity-0' : 'opacity-100'}`}
+              ref={el => imageRefs.current[activeImageIndex] = el}
+              src={selectedPath.steps[activeImageIndex].image} 
+              alt={selectedPath.steps[activeImageIndex].description || `Step ${activeImageIndex + 1}`}
+              className="w-full h-full object-cover"
               style={imageTransformStyle}
+              onLoad={() => {
+                // Ensure both images are loaded before completing transition
+                if (activeImageIndex === currentStepIndex) {
+                  setIsTransitioning(false);
+                }
+              }}
             />
           </div>
         )}
         
-        {/* Preload next and previous images for smoother transitions */}
+        {/* Preload next and previous images with proper positioning */}
         {nextStep && (
-          <div className="absolute inset-0 z-0">
+          <div className="absolute inset-0 z-10 overflow-hidden opacity-0">
             <img 
               ref={el => nextStepIndex !== null ? imageRefs.current[nextStepIndex] = el : null}
               src={nextStep.image} 
-              alt={nextStep.description || 'Next step'}
-              className="w-full h-full object-cover opacity-0"
+              alt={nextStep.description || `Step ${nextStepIndex !== null ? nextStepIndex + 1 : ''}`}
+              className="w-full h-full object-cover"
               style={{
                 objectPosition: getImagePosition(nextStep).x + ' ' + getImagePosition(nextStep).y
               }}
+              onLoad={() => setNextImageLoaded(true)}
             />
           </div>
         )}
         
         {prevStep && (
-          <div className="absolute inset-0 z-0">
+          <div className="absolute inset-0 z-10 overflow-hidden opacity-0">
             <img 
               ref={el => prevStepIndex !== null ? imageRefs.current[prevStepIndex] = el : null}
               src={prevStep.image} 
-              alt={prevStep.description || 'Previous step'}
-              className="w-full h-full object-cover opacity-0"
+              alt={prevStep.description || `Step ${prevStepIndex !== null ? prevStepIndex + 1 : ''}`}
+              className="w-full h-full object-cover"
               style={{
                 objectPosition: getImagePosition(prevStep).x + ' ' + getImagePosition(prevStep).y
               }}
+              onLoad={() => setPrevImageLoaded(true)}
             />
           </div>
         )}
@@ -353,7 +412,7 @@ const PathViewer: React.FC<PathViewerProps> = ({
       {(showControls || isMobile) && (
         <>
           <Button
-            className={`absolute left-4 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 z-20 
+            className={`absolute left-4 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 z-30 
                        ${isMobile ? 'w-12 h-12 rounded-full flex items-center justify-center' : ''}`}
             onClick={handlePrevious}
             disabled={currentStepIndex === 0 || isTransitioning}
@@ -362,7 +421,7 @@ const PathViewer: React.FC<PathViewerProps> = ({
             <ChevronLeft className={`${isMobile ? 'h-8 w-8' : 'h-6 w-6'}`} />
           </Button>
           <Button
-            className={`absolute right-4 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 z-20
+            className={`absolute right-4 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 z-30
                        ${isMobile ? 'w-12 h-12 rounded-full flex items-center justify-center' : ''}`}
             onClick={handleNext}
             disabled={currentStepIndex === selectedPath.steps.length - 1 || isTransitioning}
@@ -374,7 +433,7 @@ const PathViewer: React.FC<PathViewerProps> = ({
       )}
 
       {/* Step Indicator Pills */}
-      <ScrollArea className="absolute bottom-4 left-0 right-0 z-20 flex justify-center" orientation="horizontal">
+      <ScrollArea className="absolute bottom-4 left-0 right-0 z-30 flex justify-center" orientation="horizontal">
         <div className="flex space-x-2 justify-center px-4">
           {selectedPath.steps.map((_, index) => (
             <button
@@ -386,12 +445,17 @@ const PathViewer: React.FC<PathViewerProps> = ({
               onClick={() => {
                 if (!isTransitioning) {
                   setIsTransitioning(true);
-                  setCurrentStepIndex(index);
-                  setTimeout(() => setIsTransitioning(false), 300);
+                  // Set the target index as active immediately
+                  setActiveImageIndex(index);
+                  setTimeout(() => {
+                    setCurrentStepIndex(index);
+                  }, 50);
                   resetZoomAndPan();
+                  setTimeout(() => setIsTransitioning(false), 400);
                 }
               }}
               aria-label={`Go to step ${index + 1}`}
+              disabled={isTransitioning}
             />
           ))}
         </div>
@@ -399,16 +463,16 @@ const PathViewer: React.FC<PathViewerProps> = ({
 
       {/* Step Description */}
       {currentStep && (
-        <div className="absolute bottom-16 left-0 right-0 z-20 flex justify-center px-4">
+        <div className="absolute bottom-16 left-0 right-0 z-30 flex justify-center px-4">
           <div className={`bg-black/60 text-white px-6 py-3 rounded-lg max-w-md text-center transition-opacity duration-300 ${isTransitioning ? 'opacity-0' : 'opacity-100'}`}>
-            {currentStep.description}
+            {selectedPath.steps[activeImageIndex]?.description || ''}
           </div>
         </div>
       )}
       
       {/* Mobile zoom and pan hint (shown briefly) */}
       {isMobile && (
-        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 text-white/70 text-sm bg-black/40 px-3 py-1 rounded-full">
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-30 text-white/70 text-sm bg-black/40 px-3 py-1 rounded-full">
           Swipe to navigate • Pinch to zoom
         </div>
       )}
