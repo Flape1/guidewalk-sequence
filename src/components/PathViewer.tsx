@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef, CSSProperties } from 'react';
 import { Path } from '@/data/paths';
 import { Button } from '@/components/ui/button';
@@ -53,6 +52,7 @@ const PathViewer: React.FC<PathViewerProps> = ({
   const [nextImageLoaded, setNextImageLoaded] = useState(false);
   const [prevImageLoaded, setPrevImageLoaded] = useState(false);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
+  const [imagesLoaded, setImagesLoaded] = useState<Record<number, boolean>>({});
   
   const isMobile = useIsMobile();
   const imageContainerRef = useRef<HTMLDivElement>(null);
@@ -64,26 +64,27 @@ const PathViewer: React.FC<PathViewerProps> = ({
   // Reset currentStepIndex when selectedPathId changes
   useEffect(() => {
     setCurrentStepIndex(0);
+    setActiveImageIndex(0);
     setImageScale(1);
     setPanPosition({ x: 0, y: 0 });
+    setImagesLoaded({});
   }, [selectedPathId]);
 
   // Preload all images for the current path to ensure smooth transitions
   useEffect(() => {
     if (selectedPath && selectedPath.steps) {
-      selectedPath.steps.forEach(step => {
+      const newImagesLoaded = { ...imagesLoaded };
+      
+      selectedPath.steps.forEach((step, index) => {
         const img = new Image();
         img.src = step.image;
         img.onload = () => {
-          if (selectedPath.steps.indexOf(step) === currentStepIndex + 1) {
-            setNextImageLoaded(true);
-          } else if (selectedPath.steps.indexOf(step) === currentStepIndex - 1) {
-            setPrevImageLoaded(true);
-          }
+          newImagesLoaded[index] = true;
+          setImagesLoaded(newImagesLoaded);
         };
       });
     }
-  }, [selectedPath, currentStepIndex]);
+  }, [selectedPath]);
 
   // Set active image index to match current step after transition
   useEffect(() => {
@@ -95,34 +96,45 @@ const PathViewer: React.FC<PathViewerProps> = ({
   const handleNext = () => {
     if (selectedPath && currentStepIndex < selectedPath.steps.length - 1 && !isTransitioning) {
       setIsTransitioning(true);
-      // Set next image as active before changing index
-      setActiveImageIndex(currentStepIndex + 1);
-      setNextImageLoaded(false);
+      // Keep current image visible during transition preparation
       setTimeout(() => {
+        // Set next image as active during transition
+        setActiveImageIndex(currentStepIndex + 1);
         setCurrentStepIndex(prevIndex => prevIndex + 1);
-      }, 50); // Small delay to allow the DOM to update
+        
+        // Allow time for DOM to update before animation starts
+        setTimeout(() => {
+          setIsTransitioning(false);
+        }, 300);
+      }, 50);
+      
       resetZoomAndPan();
-      setTimeout(() => setIsTransitioning(false), 400); // Longer to ensure animation completes
     }
   };
 
   const handlePrevious = () => {
     if (currentStepIndex > 0 && !isTransitioning) {
       setIsTransitioning(true);
-      // Set previous image as active before changing index
-      setActiveImageIndex(currentStepIndex - 1);
-      setPrevImageLoaded(false);
+      // Keep current image visible during transition preparation
       setTimeout(() => {
+        // Set previous image as active during transition
+        setActiveImageIndex(currentStepIndex - 1);
         setCurrentStepIndex(prevIndex => prevIndex - 1);
-      }, 50); // Small delay to allow the DOM to update
+        
+        // Allow time for DOM to update before animation starts
+        setTimeout(() => {
+          setIsTransitioning(false);
+        }, 300);
+      }, 50);
+      
       resetZoomAndPan();
-      setTimeout(() => setIsTransitioning(false), 400); // Longer to ensure animation completes
     }
   };
 
   const resetZoomAndPan = () => {
     setImageScale(1);
     setPanPosition({ x: 0, y: 0 });
+    setLastPanPosition({ x: 0, y: 0 });
   };
 
   // Handle touch events for swiping
@@ -177,7 +189,7 @@ const PathViewer: React.FC<PathViewerProps> = ({
     const minSwipeDistance = 30; // Minimum distance required for a swipe
     
     // If the swipe is significant enough and we're not zoomed in
-    if (Math.abs(distance) > minSwipeDistance && imageScale <= 1) {
+    if (Math.abs(distance) > minSwipeDistance && imageScale <= 1 && !isTransitioning) {
       if (distance > 0) {
         // Swiped left, go to next
         handleNext();
@@ -264,29 +276,23 @@ const PathViewer: React.FC<PathViewerProps> = ({
     };
   }, [currentStepIndex, selectedPath, imageScale]);
 
-  // Function to preload the current image and adjacent images
-  const preloadImages = (path: Path, currentIndex: number) => {
-    if (!path || !path.steps) return;
+  // Handle direct navigation to specific step
+  const handleStepClick = (index: number) => {
+    if (isTransitioning || index === currentStepIndex) return;
     
-    // Array of indices to preload: current, next, and previous
-    const indicesToPreload = [
-      currentIndex,
-      currentIndex + 1 < path.steps.length ? currentIndex + 1 : null,
-      currentIndex - 1 >= 0 ? currentIndex - 1 : null
-    ].filter((idx): idx is number => idx !== null);
+    setIsTransitioning(true);
     
-    indicesToPreload.forEach(idx => {
-      const img = new Image();
-      img.src = path.steps[idx].image;
-    });
+    setTimeout(() => {
+      setActiveImageIndex(index);
+      setCurrentStepIndex(index);
+      
+      setTimeout(() => {
+        setIsTransitioning(false);
+      }, 300);
+    }, 50);
+    
+    resetZoomAndPan();
   };
-
-  // Preload images when component mounts or path/step changes
-  useEffect(() => {
-    if (selectedPath) {
-      preloadImages(selectedPath, currentStepIndex);
-    }
-  }, [selectedPath, currentStepIndex]);
 
   if (!selectedPath || !selectedPath.steps || selectedPath.steps.length === 0) {
     return (
@@ -299,17 +305,15 @@ const PathViewer: React.FC<PathViewerProps> = ({
   // Get the current step and make sure it exists before using it
   const currentStep = selectedPath.steps[currentStepIndex];
   
-  // Need to load both current and next images for smooth transitions
+  // Need to load both current and adjacent images for smooth transitions
   const nextStepIndex = currentStepIndex < selectedPath.steps.length - 1 ? currentStepIndex + 1 : null;
   const prevStepIndex = currentStepIndex > 0 ? currentStepIndex - 1 : null;
-  const nextStep = nextStepIndex !== null ? selectedPath.steps[nextStepIndex] : null;
-  const prevStep = prevStepIndex !== null ? selectedPath.steps[prevStepIndex] : null;
 
   // Image transformation styles
   const imageTransformStyle: CSSProperties = {
     transform: `scale(${imageScale}) translate(${panPosition.x}px, ${panPosition.y}px)`,
     transition: isPanning ? 'none' : 'transform 200ms ease-out',
-    objectPosition: getImagePosition(currentStep).x + ' ' + getImagePosition(currentStep).y
+    objectPosition: currentStep ? getImagePosition(currentStep).x + ' ' + getImagePosition(currentStep).y : '50% 50%'
   };
 
   return (
@@ -318,7 +322,7 @@ const PathViewer: React.FC<PathViewerProps> = ({
       onMouseEnter={() => setShowControls(true)}
       onMouseLeave={() => setShowControls(false)}
     >
-      {/* Main image container */}
+      {/* Image container with transition handling */}
       <div 
         ref={imageContainerRef} 
         className="relative h-full w-full cursor-grab active:cursor-grabbing"
@@ -332,55 +336,28 @@ const PathViewer: React.FC<PathViewerProps> = ({
         }}
         onTouchEnd={handleTouchEnd}
       >
-        {/* Current visible image (active) */}
-        {selectedPath.steps[activeImageIndex] && (
-          <div className={`absolute inset-0 z-20 overflow-hidden transition-opacity duration-300 ease-in-out ${isTransitioning ? 'opacity-100' : 'opacity-100'}`}>
+        {/* Current visible image with transition */}
+        {selectedPath.steps.map((step, index) => (
+          <div 
+            key={index}
+            className={`absolute inset-0 z-20 w-full h-full transition-opacity duration-300 ease-in-out ${
+              index === activeImageIndex ? 'opacity-100' : 'opacity-0 pointer-events-none'
+            }`}
+          >
             <img 
-              ref={el => imageRefs.current[activeImageIndex] = el}
-              src={selectedPath.steps[activeImageIndex].image} 
-              alt={selectedPath.steps[activeImageIndex].description || `Step ${activeImageIndex + 1}`}
+              ref={el => imageRefs.current[index] = el}
+              src={step.image} 
+              alt={step.description || `Step ${index + 1}`}
               className="w-full h-full object-cover"
-              style={imageTransformStyle}
+              style={index === activeImageIndex ? imageTransformStyle : undefined}
               onLoad={() => {
-                // Ensure both images are loaded before completing transition
-                if (activeImageIndex === currentStepIndex) {
-                  setIsTransitioning(false);
-                }
+                const newImagesLoaded = { ...imagesLoaded };
+                newImagesLoaded[index] = true;
+                setImagesLoaded(newImagesLoaded);
               }}
             />
           </div>
-        )}
-        
-        {/* Preload next and previous images with proper positioning */}
-        {nextStep && (
-          <div className="absolute inset-0 z-10 overflow-hidden opacity-0">
-            <img 
-              ref={el => nextStepIndex !== null ? imageRefs.current[nextStepIndex] = el : null}
-              src={nextStep.image} 
-              alt={nextStep.description || `Step ${nextStepIndex !== null ? nextStepIndex + 1 : ''}`}
-              className="w-full h-full object-cover"
-              style={{
-                objectPosition: getImagePosition(nextStep).x + ' ' + getImagePosition(nextStep).y
-              }}
-              onLoad={() => setNextImageLoaded(true)}
-            />
-          </div>
-        )}
-        
-        {prevStep && (
-          <div className="absolute inset-0 z-10 overflow-hidden opacity-0">
-            <img 
-              ref={el => prevStepIndex !== null ? imageRefs.current[prevStepIndex] = el : null}
-              src={prevStep.image} 
-              alt={prevStep.description || `Step ${prevStepIndex !== null ? prevStepIndex + 1 : ''}`}
-              className="w-full h-full object-cover"
-              style={{
-                objectPosition: getImagePosition(prevStep).x + ' ' + getImagePosition(prevStep).y
-              }}
-              onLoad={() => setPrevImageLoaded(true)}
-            />
-          </div>
-        )}
+        ))}
       </div>
 
       {/* Zoom controls - show when zoomed in or controls are visible */}
@@ -433,7 +410,7 @@ const PathViewer: React.FC<PathViewerProps> = ({
       )}
 
       {/* Step Indicator Pills */}
-      <ScrollArea className="absolute bottom-4 left-0 right-0 z-30 flex justify-center" orientation="horizontal">
+      <ScrollArea className="absolute bottom-24 left-0 right-0 z-30 flex justify-center" orientation="horizontal">
         <div className="flex space-x-2 justify-center px-4">
           {selectedPath.steps.map((_, index) => (
             <button
@@ -442,18 +419,7 @@ const PathViewer: React.FC<PathViewerProps> = ({
                         ${index === currentStepIndex 
                           ? 'bg-white scale-125' 
                           : 'bg-white/50 hover:bg-white/70'}`}
-              onClick={() => {
-                if (!isTransitioning) {
-                  setIsTransitioning(true);
-                  // Set the target index as active immediately
-                  setActiveImageIndex(index);
-                  setTimeout(() => {
-                    setCurrentStepIndex(index);
-                  }, 50);
-                  resetZoomAndPan();
-                  setTimeout(() => setIsTransitioning(false), 400);
-                }
-              }}
+              onClick={() => handleStepClick(index)}
               aria-label={`Go to step ${index + 1}`}
               disabled={isTransitioning}
             />
