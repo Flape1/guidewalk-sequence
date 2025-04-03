@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Path } from '@/data/paths';
 import { Button } from '@/components/ui/button';
@@ -17,8 +18,8 @@ type ImagePosition = {
 };
 
 const getImagePosition = (step: any): ImagePosition => {
-  // Use the nextStepIndicator coordinates if available
-  if (step.nextStepIndicator) {
+  // Check if step and nextStepIndicator exist before accessing properties
+  if (step && step.nextStepIndicator) {
     return {
       x: `${step.nextStepIndicator.x}%`,
       y: `${step.nextStepIndicator.y}%`
@@ -47,7 +48,7 @@ const PathViewer: React.FC<PathViewerProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   
   // Find the selected path, defaulting to the first path if none is selected
-  const selectedPath = paths.find(p => p.id === selectedPathId) || paths[0];
+  const selectedPath = paths.find(p => p.id === selectedPathId) || (paths.length > 0 ? paths[0] : null);
   
   // Reset currentStepIndex when selectedPathId changes
   useEffect(() => {
@@ -119,8 +120,10 @@ const PathViewer: React.FC<PathViewerProps> = ({
     );
   }
 
+  // Get the current step and make sure it exists before using it
   const currentStep = selectedPath.steps[currentStepIndex];
-  const position = getImagePosition(currentStep);
+  // Ensure currentStep exists before calling getImagePosition
+  const position = currentStep ? getImagePosition(currentStep) : { x: '50%', y: '50%' };
 
   return (
     <div 
@@ -136,14 +139,16 @@ const PathViewer: React.FC<PathViewerProps> = ({
         onTouchEnd={handleTouchEnd}
       >
         <div className="h-full w-full flex items-center justify-center">
-          <img 
-            src={currentStep.image} 
-            alt={currentStep.description}
-            className={`w-full h-full object-cover transition-opacity duration-500 ${isTransitioning ? 'opacity-0' : 'opacity-100'}`}
-            style={{
-              objectPosition: `${position.x} ${position.y}`
-            }}
-          />
+          {currentStep && (
+            <img 
+              src={currentStep.image} 
+              alt={currentStep.description}
+              className={`w-full h-full object-cover transition-opacity duration-500 ${isTransitioning ? 'opacity-0' : 'opacity-100'}`}
+              style={{
+                objectPosition: `${position.x} ${position.y}`
+              }}
+            />
+          )}
         </div>
       </div>
 
@@ -180,9 +185,11 @@ const PathViewer: React.FC<PathViewerProps> = ({
       </div>
 
       {/* Step Description */}
-      <div className="absolute bottom-16 left-1/2 -translate-x-1/2 bg-black/50 text-white px-4 py-2 rounded">
-        {currentStep.description}
-      </div>
+      {currentStep && (
+        <div className="absolute bottom-16 left-1/2 -translate-x-1/2 bg-black/50 text-white px-4 py-2 rounded">
+          {currentStep.description}
+        </div>
+      )}
     </div>
   );
 };
